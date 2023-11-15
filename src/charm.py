@@ -90,6 +90,20 @@ class HardwareObserverCharm(ops.CharmBase):
         if not self.model.get_relation("cos-agent"):
             self.model.unit.status = BlockedStatus("Missing relation: [cos-agent]")
             return
+
+        check_ok, check_msg = self.hw_tool_helper.check()
+        if not check_ok:
+            self.model.unit.status = BlockedStatus(check_msg)
+            return
+
+        if check_ok and self.model.get_relation("cos-agent"):
+            # Auto-recover if checking is pass and exporter is not active
+            if not self.exporter.check_active():
+                logger.info("Checking pass, restart exporter")
+                self.exporter.restart()
+
+        logger.debug(f"Checking result: {check_ok} {check_msg}")
+
         if not self.exporter.check_health():
             self.model.unit.status = BlockedStatus("Exporter is unhealthy")
             return
